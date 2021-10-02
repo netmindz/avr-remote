@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 
+
+// https://developer.android.com/studio/publish/app-signing
+def keystorePropertiesFile = new File(System.getProperty("user.home"),"keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.canRead()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     compileSdkVersion 30
     buildToolsVersion "30.0.2"
@@ -11,15 +19,35 @@ android {
         useLibrary 'org.apache.http.legacy'
     }
 
-    buildTypes {
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
-        }
-    }
-
     lintOptions {
         abortOnError false
     }
 
+    def fromEnv=System.getenv("KEY_PASSWORD")!=null && !System.getenv("KEY_PASSWORD").trim().isEmpty()
+    if (keystorePropertiesFile.canRead() || fromEnv) {
+        signingConfigs {
+            release {
+                if (fromEnv) {
+                    keyAlias System.getenv("KEY_ALIAS")
+                    keyPassword System.getenv("KEY_PASSWORD")
+                    storeFile file(System.getenv("STORE_FILE"))
+                    storePassword System.getenv("STORE_PASSWORD")
+                } else {
+                    keyAlias keystoreProperties['keyAlias']
+                    keyPassword keystoreProperties['keyPassword']
+                    storeFile file(keystoreProperties['storeFile'])
+                    storePassword keystoreProperties['storePassword']
+
+                }
+            }
+        }
+
+        buildTypes {
+            release {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
 }
+
+

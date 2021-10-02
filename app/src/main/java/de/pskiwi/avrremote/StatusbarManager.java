@@ -17,58 +17,83 @@
 package de.pskiwi.avrremote;
 
 import android.app.Notification;
+import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
+
+import static android.content.Context.NOTIFICATION_SERVICE;
 
 public final class StatusbarManager {
 
 	public StatusbarManager(AVRApplication app) {
 		this.app = app;
 		notificationManager = (NotificationManager) app
-				.getSystemService(Context.NOTIFICATION_SERVICE);
+				.getSystemService(NOTIFICATION_SERVICE);
 
-		int icon = R.drawable.icon;
-		CharSequence tickerText = "AVR-Remote";
-		long when = System.currentTimeMillis();
-
-		notification = new Notification(icon, tickerText, when);
-		notification.flags |= Notification.FLAG_ONGOING_EVENT;
-
-		updateNotification(app, AVRRemote.class);
+		update();
 	}
 
-	private void updateNotification(AVRApplication app, Class<?> cl) {
+	private void updateNotification() {
 		Context context = app.getApplicationContext();
 		CharSequence contentTitle = "AVR-Remote";
 		CharSequence contentText = "Switch to AVR-Remote !";
-		Intent notificationIntent = new Intent(app, cl);
-		notificationIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+		Intent notificationIntent = new Intent(app, appClass);
+		notificationIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
 		PendingIntent contentIntent = PendingIntent.getActivity(app, 0,
 				notificationIntent, 0);
 
-		notification.setLatestEventInfo(context, contentTitle, contentText,
-				contentIntent);
+        // https://stackoverflow.com/questions/32345768/cannot-resolve-method-setlatesteventinfo
+		// https://developer.android.com/guide/topics/ui/notifiers/notifications.html
+		if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+			Notification.Builder builder = new Notification.Builder(context);
+
+			builder.setAutoCancel(false);
+			builder.setContentIntent(contentIntent);
+			builder.setContentTitle(contentTitle);
+			builder.setContentText(contentText);
+			builder.setSmallIcon(R.drawable.icon);
+			builder.setOngoing(true);
+
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+			{
+				String channelId = "avr_remote_channel";
+				NotificationChannel channel = new NotificationChannel(
+						channelId,
+						"AVR-Remote",
+						NotificationManager.IMPORTANCE_DEFAULT);
+				channel.setSound(null, null);
+				notificationManager.createNotificationChannel(channel);
+				builder.setChannelId(channelId);
+			}
+
+			Notification notification=builder.build();
+
+			notificationManager.notify(NOTIFICATION_ID,notification);
+		}
 	}
 
 	public void update() {
 		if (AVRSettings.isShowNotification(app)) {
-			notificationManager.notify(HELLO_ID, notification);
+			updateNotification();
 		} else {
-			notificationManager.cancel(HELLO_ID);
+			notificationManager.cancel(NOTIFICATION_ID);
 		}
 	}
 
 	public void setCurrentIntent(Class<?> class1) {
-		updateNotification(app, class1);
+		appClass=class1;
 		update();
 	}
 
+
+	private Class<?> appClass=AVRRemote.class;
 	private NotificationManager notificationManager;
 	private Notification notification;
 
 	private final AVRApplication app;
-	private static final int HELLO_ID = 1;
+	private static final int NOTIFICATION_ID = 1;
 
 }
